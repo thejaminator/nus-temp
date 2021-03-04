@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.7
 
 import os
 import sys
@@ -8,15 +8,21 @@ import getpass
 import base64
 import argparse
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
+from inspect import currentframe, getframeinfo
+
+"""Relative filepath read the creds.txt file to work with calling the script in different working directories"""
+filename = getframeinfo(currentframe()).filename
+creds_path = Path(filename).resolve().parent / "creds.txt"
 
 
 def get_date():
-    return datetime.today().strftime("%d/%m/%Y")
+    return (datetime.utcnow() + timedelta(hours=8)).strftime("%d/%m/%Y")
 
 
 def get_time_of_day():
-    hr = int(datetime.today().strftime("%H"))
+    hr = int((datetime.utcnow() + timedelta(hours=8)).strftime("%H"))
     return "P" if hr >= 12 else "A"
 
 
@@ -65,21 +71,19 @@ def submit_temp(temp, date, time_of_day, sympt_flag, fam_sympt_flag, cookie):
         "familySymptomsFlag": fam_sympt_flag
     }
 
-    logging.info(
-        f"Submitting temperature {temp} degrees for {time_of_day}M on {date} (Symptoms: {sympt_flag}, Same household with symptoms: {fam_sympt_flag})"
-    )
+    # print(f"Submitting temperature {temp} degrees for {time_of_day}M on {date}")
     response = requests.post(endpoint, cookies=cookie, data=data)
 
     if response.status_code != 200:
-        logging.error("Failed to declare temperature. HTTP Error Code: " +
-                      response.status_code)
+        print("Failed to declare temperature. HTTP Error Code: " +
+              response.status_code)
         sys.exit(1)
     else:
-        logging.info("Submitted successfully")
+        print(f"Submitted successfully")
 
 
 def get_credentials():
-    logging.info(
+    print(
         "NUSNET credentials not found. Creating a new credential file")
     print("\nWARNING: Your NUSNET credentials will be saved in plaintext.\n"
           "This has to be done so that the script can log you in.\n")
@@ -99,25 +103,25 @@ def get_credentials():
         if (password != verify):
             print("Passwords did not match!\n")
 
-    with open("creds.txt", "wb+") as f:
+    with open(creds_path, "wb+") as f:
         f.write(base64.b64encode(user.encode("ascii")) + b"\n")
         f.write(base64.b64encode(password.encode("ascii")))
 
-    logging.info("Saved NUSNET credentials in creds.txt")
+    print("Saved NUSNET credentials in creds.txt")
     return user, password
 
 
 def read_credentials():
-    if not os.path.exists("creds.txt"):
+    if not os.path.exists(creds_path):
         return get_credentials()
     else:
-        with open("creds.txt", "rb") as f:
+        with open(creds_path, "rb") as f:
             user = base64.b64decode(f.readline()).decode("ascii").strip()
             password = base64.b64decode(f.readline()).decode("ascii").strip()
         return user, password
 
 
-if __name__ == "__main__":
+def run_temp():
     parser = argparse.ArgumentParser(
         description="Submits NUS temperature declaration",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -151,13 +155,6 @@ if __name__ == "__main__":
         help="whether someone in the same household with symptoms - 'Y' or 'N'. defaults to no",
         default="N")
     args = parser.parse_args()
-    logging.basicConfig(format="[%(levelname)s] %(asctime)s: %(message)s",
-                        datefmt="%d/%m/%Y %I:%M:%S %p",
-                        level=logging.DEBUG if args.verbose else logging.INFO,
-                        handlers=[
-                            logging.FileHandler("temp.log", "a"),
-                            logging.StreamHandler()
-                        ])
 
     user, password = read_credentials()
     session_cookie = auth_and_get_cookie(user, password)
@@ -167,3 +164,5 @@ if __name__ == "__main__":
                 sympt_flag=args.sym,
                 fam_sympt_flag=args.sym,
                 cookie=session_cookie)
+
+run_temp()
