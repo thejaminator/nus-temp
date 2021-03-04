@@ -3,7 +3,6 @@
 import os
 import sys
 import random
-import logging
 import getpass
 import base64
 import argparse
@@ -47,15 +46,15 @@ def auth_and_get_cookie(user, password):
         "AuthMethod": "FormsAuthentication"
     }
 
-    logging.debug("Authenticating with VAFS")
+    print("Authenticating with VAFS")
     response = requests.post(endpoint, params=params, data=data)
     if response.status_code != 200 or "JSESSIONID" not in response.cookies:
-        logging.error(
+        print(
             "Unable to authenticate with VAFS. Are your NUSNET credentials correct?"
         )
         sys.exit(1)
     else:
-        logging.debug("VAFS successfully authenticated")
+        print("VAFS successfully authenticated")
         return response.cookies["JSESSIONID"]
 
 
